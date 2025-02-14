@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useVideoConfig, Audio, Img } from "remotion";
+import { useVideoConfig, Audio, Img, useCurrentFrame } from "remotion";
 import { generateBackgroundImage } from "@/utils/generateBackground";
+import { Button } from "@/components/ui/button";
 
 interface QuizRendererProps {
   quizTitle: string;
@@ -16,6 +17,8 @@ interface QuizRendererProps {
     reveals?: string[];
     outro?: string;
   };
+  onExport?: () => void;
+  isPreview?: boolean;
 }
 
 interface AudioState {
@@ -42,8 +45,11 @@ export const QuizRenderer: React.FC<QuizRendererProps> = ({
   font,
   countries,
   audioUrls,
+  onExport,
+  isPreview = true,
 }) => {
   const { width, height } = useVideoConfig();
+  const frame = useCurrentFrame();
   const [scrambled, setScrambled] = useState("");
   const [currentCountryIndex, setCurrentCountryIndex] = useState(-1);
   const [timer, setTimer] = useState(3);
@@ -58,6 +64,7 @@ export const QuizRenderer: React.FC<QuizRendererProps> = ({
     isLoading: false,
     error: null,
   });
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const initializeVideo = async () => {
@@ -202,14 +209,45 @@ export const QuizRenderer: React.FC<QuizRendererProps> = ({
             height: "32%",
             objectFit: "cover",
             position: "absolute",
-            borderRadius: "28px", // This already rounds all corners
+            borderRadius: "28px",
             top: 0,
             left: 0,
             zIndex: 0,
-            overflow: "hidden", // Ensures content inside respects border-radius
+            overflow: "hidden",
           }}
         />
       )}
+
+      {/* Numbers column on the left */}
+      <div className="absolute left-8 top-[120px] flex flex-col space-y-4 z-10">
+        {Array.from({ length: 10 }, (_, i) => (
+          <div
+            key={i}
+            className="flex items-center space-x-4"
+          >
+            <div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white font-bold">
+              {i + 1}
+            </div>
+            {answeredCountries[i] && (
+              <div 
+                className={`px-4 py-1 rounded-md text-white font-medium animate-fadeIn ${
+                  i % 5 === 0
+                    ? "bg-red-500"
+                    : i % 5 === 1
+                    ? "bg-green-500"
+                    : i % 5 === 2
+                    ? "bg-blue-500"
+                    : i % 5 === 3
+                    ? "bg-yellow-500"
+                    : "bg-purple-500"
+                }`}
+              >
+                {answeredCountries[i]}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
 
       <div className="absolute top-0 left-[10px] z-10 w-[400px] flex flex-col justify-center items-center">
         <h1 className="text-2xl font-bold bg-white text-red-400 px-4 rounded-md mt-2 text-center mb-2">
@@ -230,37 +268,58 @@ export const QuizRenderer: React.FC<QuizRendererProps> = ({
       </div>
 
       {gameState.phase !== "intro" && gameState.phase !== "outro" && (
-        <div
-          className="absolute left-8 top-[5%] text-lg font-medium space-y-0"
-          style={{ maxHeight: "90%", overflowY: "auto" }}
-        >
-          <h3 className="font-semibold text-xl mb-4">Answered Countries:</h3>
-          <ul>
-            {answeredCountries.map((country, index) => (
-              <li
-                key={index}
-                className={`mb-2 text-white rounded-md px-2 ${
-                  index % 5 === 0
-                    ? "bg-red-500"
-                    : index % 5 === 1
-                    ? "bg-green-500"
-                    : index % 5 === 2
-                    ? "bg-blue-500"
-                    : index % 5 === 3
-                    ? "bg-yellow-500"
-                    : "bg-purple-500"
-                }`}
-              >{`${index + 1}. ${country}`}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {gameState.phase !== "intro" && gameState.phase !== "outro" && (
         <div className="absolute bottom-8 w-full text-center text-lg">
           {currentCountryIndex + 1} / 10
         </div>
       )}
+
+      <div className="absolute bottom-4 right-4 z-20">
+        <Button
+          onClick={async () => {
+            try {
+              const video = document.querySelector('video');
+              if (!video) return;
+              
+              // Create a MediaRecorder to capture the video
+              const stream = video.captureStream();
+              const mediaRecorder = new MediaRecorder(stream, {
+                mimeType: 'video/webm'
+              });
+              
+              const chunks: BlobPart[] = [];
+              mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+              mediaRecorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'quiz-video.webm';
+                document.body.appendChild(a);
+                a.click();
+                URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+              };
+              
+              // Start recording
+              mediaRecorder.start();
+              
+              // Play the video
+              await video.play();
+              
+              // Stop recording after the video duration
+              setTimeout(() => {
+                mediaRecorder.stop();
+                video.pause();
+              }, (300 / 30) * 1000); // Duration in frames / fps * 1000 for milliseconds
+            } catch (error) {
+              console.error('Failed to export video:', error);
+            }
+          }}
+          className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md"
+        >
+          Export Video
+        </Button>
+      </div>
 
       {audioState.currentAudio && !audioState.error && (
         <Audio src={audioState.currentAudio} startFrom={0} />

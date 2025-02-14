@@ -8,9 +8,54 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export default function Home() {
   const [quizConfig, setQuizConfig] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const handleQuizGenerated = (config: any) => {
     setQuizConfig(config);
+  };
+
+  const handleExport = async () => {
+    if (!quizConfig) return;
+    
+    try {
+      // Use the Remotion Player's imperative API to render
+      const video = document.querySelector('video');
+      if (!video) return;
+      
+      // Create a MediaRecorder to capture the video
+      const stream = video.captureStream();
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm'
+      });
+      
+      const chunks: BlobPart[] = [];
+      mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'quiz-video.webm';
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      };
+      
+      // Start recording
+      mediaRecorder.start();
+      
+      // Play the video
+      await video.play();
+      
+      // Stop recording after the video duration
+      setTimeout(() => {
+        mediaRecorder.stop();
+        video.pause();
+      }, (300 / 30) * 1000); // Duration in frames / fps * 1000 for milliseconds
+    } catch (error) {
+      console.error('Failed to export video:', error);
+    }
   };
 
   return (
@@ -46,7 +91,11 @@ export default function Home() {
                     <div className="relative aspect-[9/16] h-[600px] w-[400px] rounded-2xl overflow-hidden shadow-lg">
                       <Player
                         component={QuizRenderer}
-                        inputProps={quizConfig}
+                        inputProps={{
+                          ...quizConfig,
+                          onExport: handleExport,
+                          isPreview: true
+                        }}
                         durationInFrames={300}
                         compositionWidth={1080}
                         compositionHeight={1920}
