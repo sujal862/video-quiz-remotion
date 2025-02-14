@@ -110,7 +110,7 @@ export const QuizRenderer: React.FC<QuizRendererProps> = ({
         }));
       }
 
-      // Move to question after 2 seconds
+      // Move to question after 2.5 seconds
       setTimeout(() => {
         const country = countries[currentCountryIndex];
         const shuffled = country
@@ -122,11 +122,11 @@ export const QuizRenderer: React.FC<QuizRendererProps> = ({
           phase: "question",
           message: shuffled,
         });
-      }, 2000);
+      }, 2500);
     }
 
     if (gameState.phase === "question") {
-      // Start countdown after 0.5 seconds of showing scrambled word
+      // Start countdown after 1 second of showing scrambled word
       setTimeout(() => {
         setGameState({
           phase: "countdown",
@@ -154,13 +154,13 @@ export const QuizRenderer: React.FC<QuizRendererProps> = ({
         }, 1000);
 
         return () => clearInterval(interval);
-      }, 500);
+      }, 1000);
     }
 
     if (gameState.phase === "reveal") {
       setAnsweredCountries((prev) => [...prev, countries[currentCountryIndex]]);
 
-      // Move to next question or outro
+      // Move to next question or outro after 3 seconds
       setTimeout(() => {
         if (currentCountryIndex < countries.length - 1) {
           setCurrentCountryIndex((prev) => prev + 1);
@@ -180,7 +180,7 @@ export const QuizRenderer: React.FC<QuizRendererProps> = ({
             }));
           }
         }
-      }, 2000);
+      }, 3000);
     }
   }, [gameState.phase, currentCountryIndex, countries, audioUrls, scrambled]);
 
